@@ -79,7 +79,19 @@ INSERT INTO SUPPLIER_CONTRACTS (CONTRACT_ID, SUPPLIER_NAME, CONTRACT_TEXT) VALUE
 ('CTR-004', 'GenericHealth Co', 'Standard Contract. Late delivery penalty is 2% per day late. All quality issues require a 24-hour RCA (Root Cause Analysis).');
 
 -- ==========================================
--- 6. WORKFLOW AUTOMATION (ACTION LAYER)
+-- 6. ENTERPRISE AUDIT LOG (GOVERNANCE LAYER)
+-- ==========================================
+CREATE OR REPLACE TABLE AI_AUDIT_LOG (
+    LOG_ID INT AUTOINCREMENT,
+    TIMESTAMP TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    USER_QUERY STRING,
+    DETECTED_INTENT STRING,
+    CORTEX_INSIGHT STRING,
+    ACTION_TAKEN STRING
+);
+
+-- ==========================================
+-- 7. WORKFLOW AUTOMATION (ACTION LAYER)
 -- ==========================================
 CREATE OR REPLACE PROCEDURE REBALANCE_INVENTORY(SOURCE_WH VARCHAR, DEST_WH VARCHAR, DRUG VARCHAR)
 RETURNS VARCHAR
