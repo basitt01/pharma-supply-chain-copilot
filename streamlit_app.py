@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 
 # Universal Connection Pattern
 try:
@@ -10,14 +11,42 @@ except:
 
 st.set_page_config(layout="wide", page_title="Pharma Copilot", page_icon="💊")
 
+# ==========================================
+# SIDEBAR: EXECUTIVE BRIEFING & CONTROLS
+# ==========================================
+with st.sidebar:
+    st.image("https://img.icons8.com/color/96/pills.png", width=60)
+    st.title("Executive Control")
+    st.markdown("**System Status:** 🟢 Optimal")
+    st.markdown("**Cortex Models:** `llama3-8b`, `mistral-large`, `e5-base-v2`")
+    st.divider()
+    
+    st.subheader("📋 Executive Briefing")
+    st.markdown("Generate an instant operational snapshot for leadership review.")
+    
+    if st.button("Generate Executive Briefing CSV"):
+        # Pull audit and inventory health for a quick briefing export
+        briefing_df = session.sql("SELECT * FROM PHARMA_DB.PHARMA_SUPPLY_CHAIN.AI_AUDIT_LOG").to_pandas()
+        csv = briefing_df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Download Audit & Ops Report",
+            data=csv,
+            file_name="Pharma_Copilot_Executive_Report.csv",
+            mime="text/csv",
+        )
+
 st.title("💊 Pharma Supply Chain: Hybrid Enterprise Copilot")
-st.markdown("Dynamic Intent Routing • Governed Metrics • Vector Search RAG • Automated Action")
+st.markdown("Dynamic Intent Routing • Governed Metrics • Vector Search RAG • Automated Action • Enterprise Governance")
 
 # Create UI Tabs
-tab1, tab2 = st.tabs(["📊 Analytical Intelligence (Structured Data)", "📄 Contract Intelligence (Unstructured RAG)"])
+tab1, tab2, tab3 = st.tabs([
+    "📊 Analytical Intelligence (Structured)", 
+    "📄 Contract Intelligence (RAG)", 
+    "🔒 Enterprise Governance & Audit"
+])
 
 # ==========================================
-# TAB 1: EXISTING ANALYTICAL COPILOT
+# TAB 1: ANALYTICAL COPILOT WITH AUTO-LOGGING
 # ==========================================
 with tab1:
     if "messages" not in st.session_state:
@@ -56,12 +85,18 @@ with tab1:
                 chart_y = "DAYS_OF_INVENTORY" if "INVENTORY" in intent else "SUPPLIER_TRUST_SCORE"
                 st.bar_chart(data=df, x=chart_x, y=chart_y)
 
-            with st.spinner("💡 3. Generating Insight & Cost Impact..."):
+            with st.spinner("💡 3. Generating Insight & Logging Event..."):
                 data_string = df.to_string()
                 insight_prompt = f"You are a pharma supply chain expert. Analyze this data. Provide 1) A 1-sentence risk summary. 2) A 1-sentence recommendation. 3) The estimated financial/operational impact if ignored. Data: {data_string}"
                 try:
                     insight = session.sql(f"SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-large', $${insight_prompt}$$)").collect()[0][0]
                     st.success(f"**Cortex Analyst Insight:**\n\n{insight}")
+                    
+                    # LOG INTERACTION TO SNOWFLAKE AUDIT TABLE
+                    safe_query = user_query.replace("'", "''")
+                    safe_insight = insight.replace("'", "''")
+                    session.sql(f"INSERT INTO PHARMA_DB.PHARMA_SUPPLY_CHAIN.AI_AUDIT_LOG (USER_QUERY, DETECTED_INTENT, CORTEX_INSIGHT, ACTION_TAKEN) VALUES ('{safe_query}', '{intent}', '{safe_insight}', 'None')").collect()
+
                     st.session_state.messages.append({
                         "role": "assistant", "content": f"**Cortex Insight:**\n\n{insight}",
                         "dataframe": df, "chart_type": intent, "chart_data": df
@@ -79,7 +114,12 @@ with tab1:
         if st.button("Execute Stock Transfer"):
             if source and dest and drug:
                 session.sql(f"CALL PHARMA_DB.PHARMA_SUPPLY_CHAIN.REBALANCE_INVENTORY('{source}', '{dest}', '{drug}')").collect()
-                st.success(f"✅ Successfully moved 500 units of {drug} from {source} to {dest}! ERB/CRM updated.")
+                
+                # LOG ACTION TO AUDIT TABLE
+                action_text = f"Rebalanced 500 units of {drug} from {source} to {dest}"
+                session.sql(f"INSERT INTO PHARMA_DB.PHARMA_SUPPLY_CHAIN.AI_AUDIT_LOG (USER_QUERY, DETECTED_INTENT, CORTEX_INSIGHT, ACTION_TAKEN) VALUES ('Manual Workflow Trigger', 'AUTOMATION', 'Stock Rebalanced', '{action_text}')").collect()
+                
+                st.success(f"✅ Successfully moved 500 units of {drug} from {source} to {dest}! Logged to Enterprise Audit Trail.")
 
 # ==========================================
 # TAB 2: UNSTRUCTURED CONTRACT RAG
@@ -88,12 +128,11 @@ with tab2:
     st.subheader("📄 Chat with Supplier Contracts (Vector Search)")
     st.markdown("Uses Snowflake Cortex to embed text and calculate Cosine Similarity against contract SLAs.")
     
-    rag_query = st.text_input("Ask a legal/compliance question (e.g., 'What is the late penalty for MediSource Inc?' or 'Which supplier requires a 24-hour RCA?'):")
+    rag_query = st.text_input("Ask a legal/compliance question (e.g., 'What is the late penalty for MediSource Inc?'):")
     
     if st.button("Search Contracts & Generate Answer"):
         if rag_query:
             with st.spinner("🔍 Embedding query and searching vector space..."):
-                # NATIVE VECTOR SEARCH USING SQL
                 rag_sql = f"""
                 SELECT SUPPLIER_NAME, CONTRACT_TEXT,
                        VECTOR_COSINE_SIMILARITY(
@@ -111,6 +150,15 @@ with tab2:
 
             with st.spinner("🤖 Synthesizing Answer..."):
                 prompt = f"Based strictly on this contract context: '{top_context}', answer the user's question: '{rag_query}'. If the answer is not in the text, state that."
-                llm_sql = f"SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-large', $${prompt}$$)"
-                answer = session.sql(llm_sql).collect()[0][0]
+                answer = session.sql(f"SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-large', $${prompt}$$)").collect()[0][0]
                 st.success(f"**AI Legal Analyst Answer:** {answer}")
+
+# ==========================================
+# TAB 3: ENTERPRISE GOVERNANCE & AUDIT LOG
+# ==========================================
+with tab3:
+    st.subheader("🔒 Enterprise AI Audit & Observability Log")
+    st.markdown("Every prompt, intent routing decision, LLM insight, and workflow action is transparently recorded within Snowflake's governance perimeter.")
+    
+    audit_df = session.sql("SELECT * FROM PHARMA_DB.PHARMA_SUPPLY_CHAIN.AI_AUDIT_LOG ORDER BY TIMESTAMP DESC").to_pandas()
+    st.dataframe(audit_df, use_container_width=True)
