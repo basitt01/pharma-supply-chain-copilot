@@ -1,8 +1,14 @@
 import streamlit as st
-from snowflake.snowpark.context import get_active_session
+
+# Universal Connection Pattern: Works natively in Snowflake OR externally on Streamlit Cloud
+try:
+    from snowflake.snowpark.context import get_active_session
+    session = get_active_session()
+except:
+    from snowflake.snowpark import Session
+    session = Session.builder.configs(st.secrets["connections"]["snowflake"]).create()
 
 st.set_page_config(layout="wide")
-session = get_active_session()
 
 st.title("💊 Pharma Supply Chain: Hybrid Copilot")
 st.markdown("Dynamic Intent Routing -> Governed Data -> Qualitative Insights")
