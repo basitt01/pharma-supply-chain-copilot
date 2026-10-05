@@ -10,90 +10,107 @@ except:
 
 st.set_page_config(layout="wide", page_title="Pharma Copilot", page_icon="💊")
 
-st.title("💊 Pharma Supply Chain: AI Copilot")
-st.markdown("Dynamic Intent Routing • Governed Metrics • Financial Impact • Automated Action")
+st.title("💊 Pharma Supply Chain: Hybrid Enterprise Copilot")
+st.markdown("Dynamic Intent Routing • Governed Metrics • Vector Search RAG • Automated Action")
 
-# 1. Initialize chat history for the ChatGPT-style UI
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# Create UI Tabs
+tab1, tab2 = st.tabs(["📊 Analytical Intelligence (Structured Data)", "📄 Contract Intelligence (Unstructured RAG)"])
 
-# Display previous chat messages and charts
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-        if "dataframe" in message:
-            st.dataframe(message["dataframe"], use_container_width=True)
-        if "chart_data" in message:
-            # Render the correct chart type from history
-            if message["chart_type"] == "INVENTORY":
-                st.bar_chart(data=message["chart_data"], x="DRUG_ID", y="DAYS_OF_INVENTORY")
-            else:
-                st.bar_chart(data=message["chart_data"], x="SUPPLIER_NAME", y="SUPPLIER_TRUST_SCORE")
+# ==========================================
+# TAB 1: EXISTING ANALYTICAL COPILOT
+# ==========================================
+with tab1:
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-# 2. Chat Input Box (Appears at bottom of screen)
-if user_query := st.chat_input("Ask a supply chain question (e.g., 'Check inventory health'):"):
-    
-    # Add user question to screen
-    st.session_state.messages.append({"role": "user", "content": user_query})
-    with st.chat_message("user"):
-        st.markdown(user_query)
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+            if "dataframe" in message:
+                st.dataframe(message["dataframe"], use_container_width=True)
+            if "chart_data" in message:
+                if message["chart_type"] == "INVENTORY":
+                    st.bar_chart(data=message["chart_data"], x="DRUG_ID", y="DAYS_OF_INVENTORY")
+                else:
+                    st.bar_chart(data=message["chart_data"], x="SUPPLIER_NAME", y="SUPPLIER_TRUST_SCORE")
 
-    # Generate Assistant Response
-    with st.chat_message("assistant"):
-        with st.spinner("🧠 1. Routing intent via Llama 3..."):
-            route_prompt = f"Categorize this question into strictly one of two words: 'INVENTORY' or 'SUPPLIERS'. Return ONLY the word. Question: {user_query}"
-            intent_query = f"SELECT SNOWFLAKE.CORTEX.COMPLETE('llama3-8b', $${route_prompt}$$)"
-            intent = session.sql(intent_query).collect()[0][0].strip().upper()
-            st.info(f"**Domain Router:** Triggering `{intent}` Semantic View.")
+    if user_query := st.chat_input("Ask a supply chain metrics question (e.g., 'Check inventory health'):"):
+        st.session_state.messages.append({"role": "user", "content": user_query})
+        with st.chat_message("user"):
+            st.markdown(user_query)
 
-        with st.spinner("📊 2. Querying Governed Semantic Layer & Building Visuals..."):
-            if "INVENTORY" in intent:
-                df = session.sql("SELECT * FROM PHARMA_DB.PHARMA_SUPPLY_CHAIN.INVENTORY_HEALTH_VIEW ORDER BY Days_Of_Inventory ASC LIMIT 5").to_pandas()
-                st.dataframe(df, use_container_width=True)
-                # Dynamic Bar Chart for Inventory
-                st.bar_chart(data=df, x="DRUG_ID", y="DAYS_OF_INVENTORY")
-            else:
-                df = session.sql("SELECT * FROM PHARMA_DB.PHARMA_SUPPLY_CHAIN.SUPPLIER_RELIABILITY_VIEW ORDER BY Supplier_Trust_Score ASC LIMIT 5").to_pandas()
-                st.dataframe(df, use_container_width=True)
-                # Dynamic Bar Chart for Suppliers
-                st.bar_chart(data=df, x="SUPPLIER_NAME", y="SUPPLIER_TRUST_SCORE")
+        with st.chat_message("assistant"):
+            with st.spinner("🧠 1. Routing intent via Llama 3..."):
+                route_prompt = f"Categorize this question into strictly one of two words: 'INVENTORY' or 'SUPPLIERS'. Return ONLY the word. Question: {user_query}"
+                intent = session.sql(f"SELECT SNOWFLAKE.CORTEX.COMPLETE('llama3-8b', $${route_prompt}$$)").collect()[0][0].strip().upper()
+                st.info(f"**Domain Router:** Triggering `{intent}` Semantic View.")
 
-        with st.spinner("💡 3. Generating Insight & Cost Impact..."):
-            data_string = df.to_string()
-            
-            # The Upgraded Mistral Prompt (Now asks for Financial/Business Impact)
-            insight_prompt = f"You are a pharma supply chain expert. Analyze this exact data. Provide 1) A 1-sentence risk summary. 2) A 1-sentence recommendation. 3) The estimated financial or operational impact if we ignore this. Data: {data_string}"
-            
-            try:
-                insight_query = f"SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-large', $${insight_prompt}$$)"
-                insight = session.sql(insight_query).collect()[0][0]
-                st.success(f"**Cortex Analyst Insight:**\n\n{insight}")
+            with st.spinner("📊 2. Querying Governed Semantic Layer & Building Visuals..."):
+                if "INVENTORY" in intent:
+                    df = session.sql("SELECT * FROM PHARMA_DB.PHARMA_SUPPLY_CHAIN.INVENTORY_HEALTH_VIEW ORDER BY Days_Of_Inventory ASC LIMIT 5").to_pandas()
+                else:
+                    df = session.sql("SELECT * FROM PHARMA_DB.PHARMA_SUPPLY_CHAIN.SUPPLIER_RELIABILITY_VIEW ORDER BY Supplier_Trust_Score ASC LIMIT 5").to_pandas()
                 
-                # Save assistant response to memory so it stays on screen
-                st.session_state.messages.append({
-                    "role": "assistant", 
-                    "content": f"**Cortex Insight:**\n\n{insight}",
-                    "dataframe": df,
-                    "chart_type": intent,
-                    "chart_data": df
-                })
-            except Exception as e:
-                st.error(f"Could not generate insight. Error: {e}")
+                st.dataframe(df, use_container_width=True)
+                chart_x = "DRUG_ID" if "INVENTORY" in intent else "SUPPLIER_NAME"
+                chart_y = "DAYS_OF_INVENTORY" if "INVENTORY" in intent else "SUPPLIER_TRUST_SCORE"
+                st.bar_chart(data=df, x=chart_x, y=chart_y)
 
-# 3. Action Form (Pinned below the chat)
-st.divider()
-with st.expander("⚡ Workflow Automation: Emergency Rebalance", expanded=True):
-    col1, col2, col3 = st.columns(3)
-    source = col1.text_input("Source Warehouse (e.g., WH-102)")
-    dest = col2.text_input("Destination Warehouse (e.g., WH-101)")
-    drug = col3.text_input("Drug ID (e.g., DRG-001-PARACETAMOL)") 
+            with st.spinner("💡 3. Generating Insight & Cost Impact..."):
+                data_string = df.to_string()
+                insight_prompt = f"You are a pharma supply chain expert. Analyze this data. Provide 1) A 1-sentence risk summary. 2) A 1-sentence recommendation. 3) The estimated financial/operational impact if ignored. Data: {data_string}"
+                try:
+                    insight = session.sql(f"SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-large', $${insight_prompt}$$)").collect()[0][0]
+                    st.success(f"**Cortex Analyst Insight:**\n\n{insight}")
+                    st.session_state.messages.append({
+                        "role": "assistant", "content": f"**Cortex Insight:**\n\n{insight}",
+                        "dataframe": df, "chart_type": intent, "chart_data": df
+                    })
+                except Exception as e:
+                    st.error(f"Error: {e}")
 
-    if st.button("Execute Stock Transfer"):
-        if source and dest and drug:
-            try:
+    st.divider()
+    with st.expander("⚡ Workflow Automation: Emergency Rebalance", expanded=True):
+        col1, col2, col3 = st.columns(3)
+        source = col1.text_input("Source Warehouse (e.g., WH-102)")
+        dest = col2.text_input("Destination Warehouse (e.g., WH-101)")
+        drug = col3.text_input("Drug ID (e.g., DRG-001-PARACETAMOL)") 
+
+        if st.button("Execute Stock Transfer"):
+            if source and dest and drug:
                 session.sql(f"CALL PHARMA_DB.PHARMA_SUPPLY_CHAIN.REBALANCE_INVENTORY('{source}', '{dest}', '{drug}')").collect()
                 st.success(f"✅ Successfully moved 500 units of {drug} from {source} to {dest}! ERB/CRM updated.")
-            except Exception as e:
-                st.error(f"Error executing procedure: {e}")
-        else:
-            st.warning("Please fill in all three fields.")
+
+# ==========================================
+# TAB 2: UNSTRUCTURED CONTRACT RAG
+# ==========================================
+with tab2:
+    st.subheader("📄 Chat with Supplier Contracts (Vector Search)")
+    st.markdown("Uses Snowflake Cortex to embed text and calculate Cosine Similarity against contract SLAs.")
+    
+    rag_query = st.text_input("Ask a legal/compliance question (e.g., 'What is the late penalty for MediSource Inc?' or 'Which supplier requires a 24-hour RCA?'):")
+    
+    if st.button("Search Contracts & Generate Answer"):
+        if rag_query:
+            with st.spinner("🔍 Embedding query and searching vector space..."):
+                # NATIVE VECTOR SEARCH USING SQL
+                rag_sql = f"""
+                SELECT SUPPLIER_NAME, CONTRACT_TEXT,
+                       VECTOR_COSINE_SIMILARITY(
+                           SNOWFLAKE.CORTEX.EMBED_TEXT_768('e5-base-v2', CONTRACT_TEXT),
+                           SNOWFLAKE.CORTEX.EMBED_TEXT_768('e5-base-v2', $${rag_query}$$)
+                       ) as sim_score
+                FROM PHARMA_DB.PHARMA_SUPPLY_CHAIN.SUPPLIER_CONTRACTS
+                ORDER BY sim_score DESC LIMIT 1;
+                """
+                rag_result = session.sql(rag_sql).collect()
+                top_supplier = rag_result[0][0]
+                top_context = rag_result[0][1]
+                
+                st.info(f"**Retrieved Highest-Matching Context (Supplier: {top_supplier}):**\n\n> *{top_context}*")
+
+            with st.spinner("🤖 Synthesizing Answer..."):
+                prompt = f"Based strictly on this contract context: '{top_context}', answer the user's question: '{rag_query}'. If the answer is not in the text, state that."
+                llm_sql = f"SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-large', $${prompt}$$)"
+                answer = session.sql(llm_sql).collect()[0][0]
+                st.success(f"**AI Legal Analyst Answer:** {answer}")
